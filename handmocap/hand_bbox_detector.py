@@ -53,7 +53,7 @@ class Third_View_Detector(BodyPoseEstimator):
         cfg = get_cfg()
         cfg.merge_from_file("detectors/hand_only_detector/faster_rcnn_X_101_32x8d_FPN_3x_100DOH.yaml")
         cfg.MODEL.WEIGHTS = 'extra_data/hand_module/hand_detector/model_0529999.pth' # add model weight here
-        cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.3  # 0.3 , use low thresh to increase recall
+        cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.05  # 0.3 , use low thresh to increase recall
         self.hand_detector = DefaultPredictor(cfg)
 
 
