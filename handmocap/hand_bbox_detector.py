@@ -25,7 +25,7 @@ from detectron2.engine import DefaultPredictor
 # from detectron2.data.datasets import register_coco_instances
 
 # Type-aware hand (hand-object) hand detector
-hand_object_detector_path = './detectors/hand_object_detector'
+hand_object_detector_path = __file__ + '/../../' + './detectors/hand_object_detector'
 sys.path.append(hand_object_detector_path)
 from model.utils.config import cfg as cfgg
 
@@ -45,14 +45,15 @@ class Third_View_Detector(BodyPoseEstimator):
     def __init__(self):
         super(Third_View_Detector, self).__init__()
         print("Loading Third View Hand Detector")
+        self.dir = osp.dirname(osp.dirname(__file__))
         self.__load_hand_detector()
     
 
     def __load_hand_detector(self):
          # load cfg and model
         cfg = get_cfg()
-        cfg.merge_from_file("detectors/hand_only_detector/faster_rcnn_X_101_32x8d_FPN_3x_100DOH.yaml")
-        cfg.MODEL.WEIGHTS = 'extra_data/hand_module/hand_detector/model_0529999.pth' # add model weight here
+        cfg.merge_from_file(self.dir + "/detectors/hand_only_detector/faster_rcnn_X_101_32x8d_FPN_3x_100DOH.yaml")
+        cfg.MODEL.WEIGHTS = self.dir + '/extra_data/hand_module/hand_detector/model_0529999.pth' # add model weight here
         cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.05  # 0.3 , use low thresh to increase recall
         self.hand_detector = DefaultPredictor(cfg)
 
@@ -152,7 +153,7 @@ class Ego_Centric_Detector(BodyPoseEstimator):
         fasterRCNN.create_architecture()
         self.classes = classes
 
-        checkpoint_path = "extra_data/hand_module/hand_detector/faster_rcnn_1_8_132028.pth"
+        checkpoint_path = osp.dirname(__file__) +  "/../extra_data/hand_module/hand_detector/faster_rcnn_1_8_132028.pth"
         checkpoint = torch.load(checkpoint_path)
         assert osp.exists(checkpoint_path), "Hand checkpoint does not exist"
         fasterRCNN.load_state_dict(checkpoint['model'])

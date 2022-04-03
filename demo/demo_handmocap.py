@@ -27,7 +27,6 @@ from pytorch3d.structures import Meshes
 
 
 def run_hand_mocap(args, bbox_detector, hand_mocap, visualizer):
-    hand_wrapper = ManopthWrapper('/checkpoint/yufeiy2/pretrain_model/smplx/mano').cuda()
     #Set up input data (images or webcam)
     input_type, input_data = demo_utils.setup_input(args)
  
