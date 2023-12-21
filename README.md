@@ -1,6 +1,4 @@
-## Judy's personal modification:
-Change the model path relative to frankmocap root instead of current working directory.
-
+# FrankMocap modification version
 
 # FrankMocap: A Strong and Easy-to-use Single View 3D Hand+Body Pose Estimator
 

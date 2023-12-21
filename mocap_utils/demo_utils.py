@@ -51,6 +51,8 @@ def __get_input_type(args):
             input_type ='image_dir'
     elif args.input_path =='webcam':
         input_type ='webcam'
+    elif extension.lower() in image_exts:
+        input_type = 'image'
     else:
         assert False, "Unknown input path. It should be an image," + \
             "or an image folder, or a video file, or \'webcam\' "
@@ -129,6 +131,8 @@ def setup_input(args):
                 body_bbox_list = body_bbox_list
             ))
         return input_type, input_data
+    elif input_type == 'image':
+        return input_type, args.input_path
 
     else:
         assert False, "Unknown input type"

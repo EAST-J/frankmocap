@@ -6,11 +6,9 @@ import numpy as np
 import cv2
 import json
 import torch
-from torchvision.transforms import Normalize, ToTensor, Resize
+from torchvision.transforms import Normalize
 
 from demo.demo_options import DemoOptions
-from hand_utils import ManopthWrapper, cvt_axisang_t_i2o, cvt_axisang_t_o2i
-from handmocap.hand_modules.h3dw_model import extract_hand_output
 import mocap_utils.general_utils as gnu
 import mocap_utils.demo_utils as demo_utils
 
@@ -20,10 +18,6 @@ from handmocap.hand_bbox_detector import HandBboxDetector
 import renderer.image_utils as imu
 from renderer.viewer2D import ImShow
 import time
-from jutils import geom_utils, image_utils, mesh_utils
-from pytorch3d.renderer import OrthographicCameras, PerspectiveCameras
-from pytorch3d.transforms import Translate
-from pytorch3d.structures import Meshes
 
 
 def run_hand_mocap(args, bbox_detector, hand_mocap, visualizer):
@@ -44,7 +38,8 @@ def run_hand_mocap(args, bbox_detector, hand_mocap, visualizer):
                 img_original_bgr  = cv2.imread(image_path)
             else:
                 img_original_bgr = None
-
+        elif input_type == 'image':
+            img_original_bgr  = cv2.imread(input_data)
         elif input_type == 'bbox_dir':
             if cur_frame < len(input_data):
                 print("Use pre-computed bounding boxes")
@@ -114,7 +109,8 @@ def run_hand_mocap(args, bbox_detector, hand_mocap, visualizer):
         if len(hand_bbox_list) < 1:
             print(f"No hand deteced: {image_path}")
             continue
-    
+        # TODO: add 2D keypoints 
+
         # Hand Pose Regression
         pred_output_list = hand_mocap.regress(
                 img_original_bgr, hand_bbox_list, add_margin=True)
@@ -138,7 +134,6 @@ def run_hand_mocap(args, bbox_detector, hand_mocap, visualizer):
         # save the image (we can make an option here)
         if args.out_dir is not None:
             demo_utils.save_res_img(args.out_dir, image_path, res_img)
-            # my_vis(img_original_bgr, pred_output_list, hand_wrapper,  osp.join(args.out_dir, 'crop', osp.basename(image_path) + '_my.jpg'))
 
         # save predictions to pkl
         if args.save_pred_pkl:
@@ -157,81 +152,7 @@ def run_hand_mocap(args, bbox_detector, hand_mocap, visualizer):
         input_data.release()
     cv2.destroyAllWindows()
 
-
-def my_vis(orig_img, pred_list, hand_wrapper, fname):      
-    one_hand = pred_list[0]['right_hand']
-    image = one_hand['img_cropped']
-    device = 'cuda:0'
-
-    pose = torch.FloatTensor(one_hand['pred_hand_pose']).to(device)
-    rot, hA = pose[..., :3], pose[..., 3:]
-    hA = hA.clone() + hand_wrapper.hand_mean
-    
-    # glb = geom_utils.matrix_to_se3(geom_utils.axis_angle_t_to_matrix(rot))
-    t = torch.zeros_like(rot)
-    # rot, t = cvt_axisang_t_o2i(rot, t)
-    glb = geom_utils.matrix_to_se3(geom_utils.axis_angle_t_to_matrix(rot, t))
-    wHand, wJoints = hand_wrapper(glb, hA, th_betas=torch.FloatTensor(one_hand['pred_hand_betas']).to(device))
-    wHand = wHand.update_padded(wHand.verts_padded() - wJoints[:, 5:6])
-
-    # f = 100
-    cam = one_hand['pred_camera']
-    new_center = one_hand['bbox_top_left'] + 112 / one_hand['bbox_scale_ratio']  - 100
-    new_size = 224 / one_hand['bbox_scale_ratio']  * 2
-    resize=300
-    image = crop_image(orig_img, new_center, new_size, resize)
-    cam, topleft, scale = image_utils.crop_weak_cam(cam, one_hand['bbox_top_left'], one_hand['bbox_scale_ratio'], 
-        new_center, new_size, resize=resize)
-
-    def get_cam_fp(cam):
-        s, tx, ty = torch.split(torch.FloatTensor(cam), 1, dim=-1)
-        fx = 10
-        px = 1
-        f = torch.FloatTensor([fx, fx])
-        p = torch.FloatTensor([px, px])
-
-        # translate = torch.FloatTensor([tx, ty, fx/s]).to(device)
-        translate = mesh_utils.weak_to_full_persp(f[0:1], p.unsqueeze(0), s, torch.cat([tx, ty], dim=-1))
-        translate = translate.to(device)[0]
-        print(cam, one_hand['pred_camera'], translate)
-        return translate, f, p
-
-    def get_cTh(hA, rot, translate, ):
-        _, joints = hand_wrapper(
-            geom_utils.matrix_to_se3(geom_utils.axis_angle_t_to_matrix(rot[None])), 
-            hA[None])
-        
-        cTh = geom_utils.axis_angle_t_to_matrix(
-            rot, translate - joints[0, 5])
-        return cTh
-
-    translate, f, p, = get_cam_fp(cam)
-    cTh = get_cTh(hA[0], rot[0], translate)
-    cHand, _ = hand_wrapper(geom_utils.matrix_to_se3(cTh[None]), hA)
-    cameras = PerspectiveCameras(f[None], p[None], device='cuda:0')
-    # cameras = OrthographicCameras(s, torch.stack([s*tx, s*ty], -1), device=device)
-    # cHand = wHand
-    print(cTh, translate)
-
-    render = mesh_utils.render_mesh(cHand, cameras, out_size=resize)
-    image_list = mesh_utils.render_geom_rot(cHand, scale_geom=True)
-    
-    image_inp = Resize(resize)(ToTensor()(image).to(device))
-    out = render['image'] * render['mask'] + image_inp * (1 - render['mask'])
-    image_utils.save_images(out, osp.join(fname + '_hand'))
-    image_utils.save_gif(image_list, fname + '_hand')
-    cv2.imwrite(fname + '_inp.jpg', image)
-
-
-def crop_image(img_ori, new_center, new_size, resize):
-    x, y = new_center
-    h = new_size / 2
-    bbox = [x - h, y - h, x + h, y + h]
-    image = image_utils.crop_resize(img_ori, bbox, resize)
-    return image
-
-
-    
+  
 def main():
     args = DemoOptions().parse()
     args.use_smplx = True
