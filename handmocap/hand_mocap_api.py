@@ -174,7 +174,7 @@ class HandMocap:
                         faces = self.model_regressor.right_hand_faces_local
                         pred_pose = pred_res['pred_pose_params'].copy()
                         pred_joints = pred_res['pred_joints_3d'].copy()[0]
-
+                        pred_hand_root = pred_res['pred_hand_root'][0]
                         if hand_type == 'left_hand':
                             cam[1] *= -1
                             pred_verts_origin[:, 0] *= -1
@@ -182,11 +182,13 @@ class HandMocap:
                             pred_pose[:, 1::3] *= -1
                             pred_pose[:, 2::3] *= -1
                             pred_joints[:, 0] *= -1
+                            pred_hand_root *= -1
 
                         pred_output[hand_type] = dict()
                         pred_output[hand_type]['pred_vertices_smpl'] = pred_verts_origin # SMPL-X hand vertex in bbox space
                         pred_output[hand_type]['pred_joints_smpl'] = pred_joints
                         pred_output[hand_type]['faces'] = faces
+                        pred_output[hand_type]['pred_hand_root'] = pred_hand_root
 
                         pred_output[hand_type]['bbox_scale_ratio'] = bbox_scale_ratio
                         pred_output[hand_type]['bbox_top_left'] = np.array(bbox_processed[:2])

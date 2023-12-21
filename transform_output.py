@@ -20,7 +20,11 @@ with open('/remote-home/jiangshijian/nerf/hoi_tools/frankmocap/tmp/mocap/00000_p
 # pred_hand_pose: 1, 48
 # pred_hand_betas: 1, 10
 # pred_camera: 3,
+'''
+似乎输出的pred_vertices_smpl和ManoLayer输出的顶点不是对应的关系，即两者的face不一样
+'''
 hand_model = ManoLayer(mano_root='../mano/models', flat_hand_mean=False, use_pca=False)
+hand_faces = hand_model.th_faces.numpy()
 right_hand = data['pred_output_list'][0]['right_hand']
 pose = torch.from_numpy(right_hand['pred_hand_pose'])
 hand_boxScale_o2n = right_hand['bbox_scale_ratio']
@@ -31,14 +35,9 @@ verts, joints = hand_model(pose, hand_beta)
 verts /= 1000.
 joints /= 1000.
 # frankmocap set the joints[5] as the root
-verts -= joints[:, 5:6, :]
+origin_root = joints[:, 5:6].clone()
 cam = right_hand['pred_camera']
-vert_bboxcoord = convert_smpl_to_bbox(
-    verts[0].numpy(), cam[0], cam[1:], bAppTransFirst=True)
-vert_imgcoord = convert_bbox_to_oriIm(
-                                vert_bboxcoord, hand_boxScale_o2n, hand_bboxTopLeft, 
-                                512, 512)
-if True:
+if False:
     K, pred_full_t = camera_utils.convert_weak_perspective_to_full(cam, 5000, 224, hand_boxScale_o2n, hand_bboxTopLeft)
     verts_np = verts[0].numpy()
     verts_np += pred_full_t
@@ -47,23 +46,29 @@ if True:
     from renderer.screen_free_visualizer import Visualizer
     visualizer = Visualizer('pytorch3d')
     hand_bbox_list = data['hand_bbox_list']
-    pred_mesh_list = [{'vertices': vert_imgcoord, 'faces': hand_model.th_faces.numpy()}]
+    pred_mesh_list = [{'vertices': uv, 'faces': hand_model.th_faces.numpy()}]
     img_original_bgr = cv2.imread(data['image_path'])
     res_img = visualizer.visualize(
             img_original_bgr, 
             pred_mesh_list = pred_mesh_list, 
             hand_bbox_list = hand_bbox_list)
     cv2.imwrite('tmp.jpg', res_img)
-
-# global_rot_matrix = geom_utils.axis_angle_to_matrix(global_rot)
-# hand_pose = torch.cat([torch.zeros_like(global_rot), hand_pose], dim=1) # For 48-dim, set the global rot to zero
-# verts, joints = hand_model(hand_pose, hand_beta)
-# verts /= 1000. # transform to the meter
-# joints /= 1000.
+K, pred_full_t = camera_utils.convert_weak_perspective_to_full(cam, 5000, 224, hand_boxScale_o2n, hand_bboxTopLeft)
+pred_full_t = torch.from_numpy(pred_full_t).unsqueeze(0)
+global_rot_matrix = geom_utils.axis_angle_to_matrix(global_rot)
+hand_pose = torch.cat([torch.zeros_like(global_rot), hand_pose], dim=1) # For 48-dim, set the global rot to zero
+verts, joints = hand_model(hand_pose, hand_beta)
+verts /= 1000. # transform to the meter
+joints /= 1000.
+wrist_root = joints[:, 0:1].clone()
 # root = joints[:, 0:1] # set the wrist as the root
-# verts -= root
+verts -= wrist_root
+# get the same results as frankmocap results
+verts = verts @ global_rot_matrix.transpose(1, 2) + wrist_root - origin_root + pred_full_t
+rot_w2c = global_rot_matrix
+trans_w2c = wrist_root - origin_root + pred_full_t
 '''
 transform between the normalized coordinate and the frankmocap output coordinate
 '''
-# TODO: 将坐标系放到Wrist的原点，计算R，T变换的矩阵
+# TODO: 将坐标系放到Wrist的原点(Hand-Wrist相当于世界坐标系)，计算R，T变换的矩阵
 

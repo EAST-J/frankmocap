@@ -36,7 +36,7 @@ def extract_hand_output(output, hand_type, hand_info, top_finger_joints_type='av
     vertices = output.vertices
     joints = output.joints
     vertices_shift = vertices - joints[:, hand_start_idx:hand_start_idx+1, :]
-
+    hand_joint_root = joints[:, hand_start_idx:hand_start_idx+1, :].clone()
     hand_verts_idx = torch.Tensor(hand_info[f'{hand_type}_hand_verts_idx']).long()
     if use_cuda:
         hand_verts_idx = hand_verts_idx.cuda()
@@ -61,7 +61,8 @@ def extract_hand_output(output, hand_type, hand_info, top_finger_joints_type='av
         hand_vertices = hand_verts,
         hand_vertices_shift = hand_verts_shift,
         hand_joints = hand_joints,
-        hand_joints_shift = hand_joints_shift
+        hand_joints_shift = hand_joints_shift,
+        hand_joint_root = hand_joint_root
     )
     return output
 
@@ -209,7 +210,8 @@ class H3DWModel(object):
 
         pred_verts = hand_output['vertices_shift']
         pred_joints_3d = hand_output['hand_joints_shift']
-        return pred_verts, pred_joints_3d
+        pred_hand_root = hand_output['hand_joint_root']
+        return pred_verts, pred_joints_3d, pred_hand_root
 
 
     def forward(self):
@@ -229,7 +231,7 @@ class H3DWModel(object):
         self.pred_shape_params = self.final_params[:, (cam_dim + pose_dim):]
 
         #  get predicted smpl verts and joints,
-        self.pred_verts, self.pred_joints_3d = self.get_smplx_output(
+        self.pred_verts, self.pred_joints_3d, self.pred_hand_root = self.get_smplx_output(
             self.pred_pose_params, self.pred_shape_params)
 
 
@@ -245,6 +247,7 @@ class H3DWModel(object):
             pred_pose_params = self.pred_pose_params.cpu().numpy(),
             pred_verts = self.pred_verts.cpu().numpy()[:, self.right_hand_verts_idx, :],
             pred_joints_3d = self.pred_joints_3d.cpu().numpy(),
+            pred_hand_root = self.pred_hand_root.cpu().numpy()
         )
         return pred_result
 
