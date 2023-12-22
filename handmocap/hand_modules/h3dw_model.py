@@ -23,7 +23,7 @@ import time
 import mocap_utils.general_utils as gnu
 import smplx
 import pdb
-
+from manopth.manolayer import ManoLayer
 
 def extract_hand_output(output, hand_type, hand_info, top_finger_joints_type='ave', use_cuda=True):
     assert hand_type in ['left', 'right']
@@ -125,7 +125,7 @@ class H3DWModel(object):
             num_betas = 10,
             use_pca = False,
             ext='pkl').cuda()
-
+        self.mano = ManoLayer(mano_root='/remote-home/jiangshijian/nerf/hoi_tools/mano/models', flat_hand_mean=False, use_pca=False).cuda()
         # set encoder and optimizer
         self.encoder = H3DWEncoder(opt, self.mean_params).cuda()
         if opt.dist:
@@ -213,6 +213,17 @@ class H3DWModel(object):
         pred_hand_root = hand_output['hand_joint_root']
         return pred_verts, pred_joints_3d, pred_hand_root
 
+    def get_mano_output(self, pose_params, shape_params=None):
+        hand_rotation = pose_params[:, :3]
+        hand_pose = pose_params[:, 3:]
+        _, joints = self.mano(torch.cat([hand_rotation, hand_pose], dim=1), shape_params)
+        joints /= 1000.
+        pred_hand_root = joints[:, 5:6].clone()
+        # Set the global rotation to zero
+        verts, joints = self.mano(torch.cat([torch.zeros_like(hand_rotation), hand_pose], dim=1), shape_params)
+        verts /= 1000.
+        joints /= 1000.
+        return verts, joints, pred_hand_root
 
     def forward(self):
         # get predicted params first
@@ -231,7 +242,9 @@ class H3DWModel(object):
         self.pred_shape_params = self.final_params[:, (cam_dim + pose_dim):]
 
         #  get predicted smpl verts and joints,
-        self.pred_verts, self.pred_joints_3d, self.pred_hand_root = self.get_smplx_output(
+        # self.pred_verts, self.pred_joints_3d, self.pred_hand_root = self.get_smplx_output(
+        #     self.pred_pose_params, self.pred_shape_params)
+        self.pred_verts, self.pred_joints_3d, self.pred_hand_root = self.get_mano_output(
             self.pred_pose_params, self.pred_shape_params)
 
 
@@ -245,7 +258,8 @@ class H3DWModel(object):
             cams = self.pred_cam_params.cpu().numpy(),
             pred_shape_params = self.pred_shape_params.cpu().numpy(),
             pred_pose_params = self.pred_pose_params.cpu().numpy(),
-            pred_verts = self.pred_verts.cpu().numpy()[:, self.right_hand_verts_idx, :],
+            # pred_verts = self.pred_verts.cpu().numpy()[:, self.right_hand_verts_idx, :],
+            pred_verts = self.pred_verts.cpu().numpy(),
             pred_joints_3d = self.pred_joints_3d.cpu().numpy(),
             pred_hand_root = self.pred_hand_root.cpu().numpy()
         )

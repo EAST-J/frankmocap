@@ -10,7 +10,7 @@ from torchvision.transforms import transforms
 from handmocap.hand_modules.test_options import TestOptions
 from handmocap.hand_modules.h3dw_model import H3DWModel
 from mocap_utils.coordconv import convert_smpl_to_bbox, convert_bbox_to_oriIm
-
+from myutils import geom_utils, camera_utils
 
 class HandMocap:
     def __init__(self, regressor_checkpoint, smpl_dir, device = torch.device('cuda') , use_smplx = False):
@@ -171,7 +171,7 @@ class HandMocap:
                         ##Output
                         cam = pred_res['cams'][0, :]  #scale, tranX, tranY
                         pred_verts_origin = pred_res['pred_verts'][0]
-                        faces = self.model_regressor.right_hand_faces_local
+                        faces = self.model_regressor.mano.th_faces.cpu().numpy()
                         pred_pose = pred_res['pred_pose_params'].copy()
                         pred_joints = pred_res['pred_joints_3d'].copy()[0]
                         pred_hand_root = pred_res['pred_hand_root'][0]
@@ -182,17 +182,21 @@ class HandMocap:
                             pred_pose[:, 1::3] *= -1
                             pred_pose[:, 2::3] *= -1
                             pred_joints[:, 0] *= -1
-                            pred_hand_root *= -1
-
+                            pred_hand_root[:, 0] *= -1
+                        pred_global_rot = geom_utils.axis_angle_to_matrix_np(pred_pose[:, :3])
+                        K, pred_full_t = camera_utils.convert_weak_perspective_to_full(cam, 5000, 224, bbox_scale_ratio, np.array(bbox_processed[:2]))
                         pred_output[hand_type] = dict()
                         pred_output[hand_type]['pred_vertices_smpl'] = pred_verts_origin # SMPL-X hand vertex in bbox space
                         pred_output[hand_type]['pred_joints_smpl'] = pred_joints
                         pred_output[hand_type]['faces'] = faces
                         pred_output[hand_type]['pred_hand_root'] = pred_hand_root
+                        pred_output[hand_type]['pred_global_rot'] = pred_global_rot[0] # (1, 3, 3)
 
                         pred_output[hand_type]['bbox_scale_ratio'] = bbox_scale_ratio
                         pred_output[hand_type]['bbox_top_left'] = np.array(bbox_processed[:2])
                         pred_output[hand_type]['pred_camera'] = cam
+                        pred_output[hand_type]['K'] = K
+                        pred_output[hand_type]['pred_full_t'] = pred_full_t.reshape(1, 3)
                         pred_output[hand_type]['img_cropped'] = img_cropped
 
                         # pred hand pose & shape params & hand joints 3d
