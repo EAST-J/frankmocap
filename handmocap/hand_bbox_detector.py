@@ -245,7 +245,7 @@ class Ego_Centric_Detector(BodyPoseEstimator):
             scores = scores.squeeze()
             pred_boxes = pred_boxes.squeeze()
 
-            thresh_hand = 0.5
+            thresh_hand = 0.8 # origin is 0.5
             j = 2
             inds = torch.nonzero(scores[:, j]>thresh_hand, as_tuple=False).view(-1)
 
@@ -284,7 +284,7 @@ class Ego_Centric_Detector(BodyPoseEstimator):
         bboxes, hand_types = self.__get_raw_hand_bbox(img)
 
         if bboxes is not None:
-            assert bboxes.shape[0] <= 2, "Ego centric version only supports one person per image"
+            assert bboxes.shape[0] <= 2, "Ego centric version only supports one person per image, but get the result {}".format(bboxes.shape[0])
 
             left_bbox = bboxes[hand_types==0]
             if len(left_bbox)>0:

@@ -172,13 +172,14 @@ class HandMocap:
                         cam = pred_res['cams'][0, :]  #scale, tranX, tranY
                         pred_verts_origin = pred_res['pred_verts'][0]
                         faces = self.model_regressor.mano.th_faces.cpu().numpy()
+                        left_faces = self.model_regressor.mano_left.th_faces.cpu().numpy()
                         pred_pose = pred_res['pred_pose_params'].copy()
                         pred_joints = pred_res['pred_joints_3d'].copy()[0]
                         pred_hand_root = pred_res['pred_hand_root'][0]
                         if hand_type == 'left_hand':
                             cam[1] *= -1
                             pred_verts_origin[:, 0] *= -1
-                            faces = faces[:, ::-1]
+                            faces = left_faces
                             pred_pose[:, 1::3] *= -1
                             pred_pose[:, 2::3] *= -1
                             pred_joints[:, 0] *= -1

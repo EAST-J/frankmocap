@@ -126,6 +126,7 @@ class H3DWModel(object):
             use_pca = False,
             ext='pkl').cuda()
         self.mano = ManoLayer(mano_root='/remote-home/jiangshijian/nerf/hoi_tools/mano/models', flat_hand_mean=False, use_pca=False).cuda()
+        self.mano_left = ManoLayer(mano_root='/remote-home/jiangshijian/nerf/hoi_tools/mano/models', side='left', flat_hand_mean=False, use_pca=False).cuda()
         # set encoder and optimizer
         self.encoder = H3DWEncoder(opt, self.mean_params).cuda()
         if opt.dist:
