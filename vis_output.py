@@ -37,7 +37,7 @@ for pkl_file in tqdm(pkl_file_list):
     right_hand = data['pred_output_list'][0]['right_hand']
     left_hand = data['pred_output_list'][0]['left_hand']
 
-    input_img = Image.open(data['image_path'])
+    input_img = Image.open(data['image_path']).convert('RGB')
     vis = vis_utils.Visualizer(img_size=(input_img.size[0], input_img.size[1]))
     '''
     transform between the normalized coordinate and the frankmocap output coordinate
@@ -47,13 +47,13 @@ for pkl_file in tqdm(pkl_file_list):
         vertices = right_hand['pred_vertices_smpl']
         tmp_joints = right_hand['pred_joints_smpl']
         tmp_wrist_root = tmp_joints[0:1].copy()
-        vertices -= tmp_wrist_root
+        # vertices -= tmp_wrist_root
         pred_hand_root = right_hand['pred_hand_root']
         pred_global_rot = right_hand['pred_global_rot']
         tmp_pred_full_t = right_hand['pred_full_t']
         tmp_K = right_hand['K']
         # transform to the camera coordinate w2c_rot: pred_global_rot w2c_trans: tmp_wrist_root - pred_hand_root + tmp_pred_full_t
-        vertices = vertices @ pred_global_rot.T + tmp_wrist_root - pred_hand_root + tmp_pred_full_t
+        vertices = vertices @ pred_global_rot.T + tmp_wrist_root - pred_hand_root + tmp_pred_full_t - tmp_wrist_root @ pred_global_rot.T
         render_img = vis.draw_mesh(np.array(input_img) / 255., vertices, hand_faces, tmp_K)
         right_bbox = data['hand_bbox_list'][0]['right_hand']
         right_bbox[2:] += right_bbox[0:2]
@@ -65,12 +65,12 @@ for pkl_file in tqdm(pkl_file_list):
         vertices = left_hand['pred_vertices_smpl']
         tmp_joints = left_hand['pred_joints_smpl']
         tmp_wrist_root = tmp_joints[0:1].copy()
-        vertices -= tmp_wrist_root
+        # vertices -= tmp_wrist_root
         pred_hand_root = left_hand['pred_hand_root']
         pred_global_rot = left_hand['pred_global_rot']
         tmp_pred_full_t = left_hand['pred_full_t']
         tmp_K = left_hand['K']
-        vertices = vertices @ pred_global_rot.T + tmp_wrist_root - pred_hand_root + tmp_pred_full_t
+        vertices = vertices @ pred_global_rot.T + tmp_wrist_root - pred_hand_root + tmp_pred_full_t - tmp_wrist_root @ pred_global_rot.T
         render_img = vis.draw_mesh(render_img, vertices, hand_faces_left, tmp_K)
         left_bbox = data['hand_bbox_list'][0]['left_hand']
         left_bbox[2:] += left_bbox[0:2]
